@@ -1,8 +1,8 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <TimeLib.h>
 #include <vector>
-#include <ArduinoJson.h>
 
 using namespace std;
 extern "C" {
@@ -17,22 +17,22 @@ extern "C" {
 #define TYPE_DATA 0x02
 #define SUBTYPE_PROBE_REQUEST 0x04
 
-string deviceMAC = "";
+String deviceMAC = "";
 
-string macToStr(const uint8_t *mac) {
-    string result;
+String macToStr(const uint8_t *mac) {
+    String result;
     for (int i = 0; i < 6; ++i) {
-        result += string(mac[i], 16);
+        result += String(mac[i], 16);
         if (i < 5)
             result += ':';
     }
     return result;
 }
 typedef struct Packet {
-    string MAC;
+    String MAC;
     time_t timestamp;
     double RSSI;
-    string selfMAC;
+    String selfMAC;
 } Packet;
 
 vector<Packet> sniffedPackets;
@@ -102,8 +102,8 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     char addr[] = "00:00:00:00:00:00";
     getMAC(addr, snifferPacket->data, 10);
     Serial.print(" Peer MAC: ");
-    int counter = 0;
-    string str(addr);
+    //int counter = 0;
+    String str(addr);
     Serial.print(str.c_str());
     Packet sniffedPacket;
     sniffedPacket.MAC = str;
@@ -111,12 +111,23 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.timestamp = now();
     sniffedPacket.selfMAC = deviceMAC;
     sniffedPackets.push_back(sniffedPacket);
+    const int capacity = JSON_OBJECT_SIZE(4);
+
+    DynamicJsonDocument doc(1024);
+    doc["MAC"] = str;
+    doc["timestamp"] = now();
+    doc["RSSI"] = sniffedPacket.RSSI;
+    doc["snifferMAC"] = deviceMAC;
+    serializeJson(doc, Serial);
+    //StaticJsonDocument<capacity> doc;
+    // doc["MAC"] = str;
+    // doc["timestamp"] = now();
+    // doc["RSSI"] = snifferPacket->rx_ctrl.rssi;
+    // doc["snifferMAC"] = deviceMAC;
 
     uint8_t SSID_length = snifferPacket->data[25];
     Serial.print(" SSID: ");
     printDataSpan(26, SSID_length, snifferPacket->data);
-    Serial.println("UZUNLUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUK");
-    Serial.println(sniffedPackets.size());
     Serial.println();
 }
 
