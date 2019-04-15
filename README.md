@@ -1,3 +1,10 @@
+<h1 align="center">Wirect</h1>
+
+<p align="center">
+  <img height="300px" src="doc/logo.png">
+</p>
+
+
 # ESP8266 WifiSniffer
 
 This is only an easy experiment which uses the ESP8266 wifi module to look for near smartphones around you. You can do this very easily with any computer and some software but this is a good way to learn the possibilities of these tiny ESP8266 modules.
@@ -27,3 +34,5 @@ I use one [nodeMCU devkit](https://github.com/nodemcu/nodemcu-devkit) because is
 - [Passive wifi tracking](http://edwardkeeble.com/2014/02/passive-wifi-tracking/)
 - [IEEE 802.11 frame format](http://www.studioreti.it/slide/802-11-Frame_E_C.pdf)
 - [esp8266 forum](http://www.esp8266.com/viewtopic.php?f=6&t=1589)
+
+
