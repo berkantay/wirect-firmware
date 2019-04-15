@@ -18,6 +18,9 @@ extern "C" {
 #define SUBTYPE_PROBE_REQUEST 0x04
 
 String deviceMAC = "";
+const char *ssid = "Yey";
+const char *password = "RiGhOLoG";
+WiFiClient client;
 
 String macToStr(const uint8_t *mac) {
     String result;
@@ -191,19 +194,25 @@ void setup() {
     wifi_set_promiscuous_rx_cb(sniffer_callback);
     delay(10);
     wifi_promiscuous_enable(ENABLE);  // setup the channel hoping callback timer
-    os_timer_disarm(&channelHop_timer);
-    os_timer_setfn(&channelHop_timer, (os_timer_func_t *)channelHop, NULL);
-    os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
+    // os_timer_disarm(&channelHop_timer);
+    // os_timer_setfn(&channelHop_timer, (os_timer_func_t *)channelHop, NULL);
+    // os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
     unsigned char mac[6];
     WiFi.macAddress(mac);
     deviceMAC += macToStr(mac);
+    Serial.println("Connecting to ");
+    Serial.println(ssid);
+    wifi_promiscuous_enable(DISABLE);
+    delay(10);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
 }
 
 void loop() {
-    time_t t = now();
-    setTime(17, 8, 59, 15, 4, 19);
-    int q = second(t);
-    Serial.println("SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAT");
-    Serial.println(t);
-    delay(999);
+    delay(10);
 }
