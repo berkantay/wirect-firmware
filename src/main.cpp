@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <TimeLib.h>
 #include <vector>
+#include <ArduinoJson.h>
 
 using namespace std;
 extern "C" {
