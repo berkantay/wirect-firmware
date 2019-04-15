@@ -1,6 +1,6 @@
 {
     "terminal.integrated.env.linux": {
-        "PATH": "/home/neutri/.platformio/penv/bin:/home/neutri/.platformio/penv:/home/neutri/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/neutri/.fzf/bin",
+        "PATH": "/home/saturn/.platformio/penv/bin:/home/saturn/.platformio/penv:/opt/google-cloud-sdk/bin:/opt/google-cloud-sdk/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/local/go/bin:/home/saturn/.gem/ruby/2.5.0/bin:/home/saturn/go/bin:/home/saturn/.local/bin:/home/saturn/.npm-global/bin:/home/saturn/kafka_2.12-2.1.1/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/usr/local/go/bin:/home/saturn/.gem/ruby/2.5.0/bin:/home/saturn/go/bin:/home/saturn/.local/bin:/home/saturn/.npm-global/bin:/home/saturn/kafka_2.12-2.1.1/bin:/home/saturn/.fzf/bin",
         "PLATFORMIO_CALLER": "vscode"
     }
 }
