@@ -1,0 +1,6 @@
+{
+    "terminal.integrated.env.linux": {
+        "PATH": "/home/neutri/.platformio/penv/bin:/home/neutri/.platformio/penv:/home/neutri/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/neutri/.fzf/bin",
+        "PLATFORMIO_CALLER": "vscode"
+    }
+}
