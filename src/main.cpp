@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <Ticker.h>
 #include <TimeLib.h>
+#include <unordered_map>
 #include <vector>
 
 using namespace std;
@@ -28,7 +29,9 @@ HTTPClient http;
 String macToStr(const uint8_t *mac) {
     String result;
     for (int i = 0; i < 6; ++i) {
-        result += String(mac[i], 16);
+        char buf[3];
+        sprintf(buf, "%02X", mac[i]);
+        result += buf;
         if (i < 5)
             result += ':';
     }
@@ -42,7 +45,7 @@ typedef struct Packet {
 } Packet;
 
 vector<Packet> sniffedPackets;
-
+unordered_map<string, Packet> sweepMap;
 struct RxControl {
     signed rssi : 8;  // signal intensity of packet
     unsigned rate : 4;
@@ -108,7 +111,7 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     char addr[] = "00:00:00:00:00:00";
     getMAC(addr, snifferPacket->data, 10);
     Serial.print(" Peer MAC: ");
-    //int counter = 0;
+
     String str(addr);
     Serial.print(str.c_str());
     Packet sniffedPacket;
@@ -116,21 +119,9 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.RSSI = snifferPacket->rx_ctrl.rssi;
     sniffedPacket.timestamp = now();
     sniffedPacket.selfMAC = deviceMAC;
-    // sniffedPackets.push_back(sniffedPacket);
-    //const int capacity = JSON_OBJECT_SIZE(4);
 
-    // DynamicJsonDocument doc(1024);
-    // doc["MAC"] = str;
-    // doc["timestamp"] = now();
-    // doc["RSSI"] = sniffedPacket.RSSI;
-    // doc["snifferMAC"] = deviceMAC;
-    // serializeJson(doc, Serial);
-
-    // //StaticJsonDocument<capacity> doc;
-    // doc["MAC"] = str;
-    // doc["timestamp"] = now();
-    // doc["RSSI"] = snifferPacket->rx_ctrl.rssi;
-    // doc["snifferMAC"] = deviceMAC;
+    string moc = str.c_str();
+    sweepMap[moc] = sniffedPacket;
 
     uint8_t SSID_length = snifferPacket->data[25];
     Serial.print(" SSID: ");
@@ -165,7 +156,16 @@ static os_timer_t sendInfo_timer;
 void channelHop() {
     // hoping channels 1-13
     uint8 new_channel = wifi_get_channel() + 1;
+
     if (new_channel > 13) {
+        Serial.print("Sweep size : ");
+        Serial.println(sweepMap.size());
+        for (auto it : sweepMap) {
+            sniffedPackets.push_back(it.second);
+        }
+        sweepMap.clear();
+        Serial.print("Total sniffed : ");
+        Serial.println(sniffedPackets.size());
         new_channel = 1;
     }
     wifi_set_channel(new_channel);
@@ -202,6 +202,7 @@ void setup() {
     deviceMAC += macToStr(mac);
 }
 void loop() {
+    //Serial.println(deviceMAC);
     if (infoFlag == 1) {
         ticker.detach();
         os_timer_disarm(&channelHop_timer);
@@ -216,10 +217,35 @@ void loop() {
         }
         Serial.println("");
         Serial.println("WiFi connected");
-        http.begin("http://192.168.43.161:1323/sniffer");
+        http.begin("http://192.168.43.161:1323/packet");
         http.addHeader("Content-Type", "application/json");
-        int httpCode = http.POST("deneme");
+
+        unsigned numberOfPackets = sniffedPackets.size();
+
+        DynamicJsonDocument doc(numberOfPackets + 1 + (numberOfPackets * 126));
+        JsonArray ar = doc.to<JsonArray>();
+
+        DynamicJsonDocument pkt(126);
+
+        for (int i = 0; i < sniffedPackets.size(); i++) {
+            JsonObject obj = pkt.to<JsonObject>();
+            Packet sniffedPacket = sniffedPackets[i];
+
+            obj["MAC"] = sniffedPacket.MAC;
+            obj["RSSI"] = sniffedPacket.RSSI;
+            obj["timestamp"] = sniffedPacket.timestamp;
+            obj["selfMAC"] = deviceMAC;
+
+            ar.add(obj);
+        }
+        String json;
+        serializeJson(ar, json);
+
+        int httpCode = http.POST(json);
         http.end();
+
+        sniffedPackets.clear();
+
         Serial.println(httpCode);
         infoFlag = 0;
         ticker.attach(20, sendInfo);
@@ -230,6 +256,7 @@ void loop() {
             delay(100);
         }
         Serial.println("Disconnected successfulyy.");
+
         promiscousSetup();
     }
 }
