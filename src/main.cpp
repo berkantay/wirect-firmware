@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
+#include <Ticker.h>
 #include <TimeLib.h>
 #include <vector>
 
@@ -21,6 +23,7 @@ String deviceMAC = "";
 const char *ssid = "Yey";
 const char *password = "RiGhOLoG";
 WiFiClient client;
+HTTPClient http;
 
 String macToStr(const uint8_t *mac) {
     String result;
@@ -34,7 +37,7 @@ String macToStr(const uint8_t *mac) {
 typedef struct Packet {
     String MAC;
     time_t timestamp;
-    double RSSI;
+    float RSSI;
     String selfMAC;
 } Packet;
 
@@ -114,15 +117,16 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.timestamp = now();
     sniffedPacket.selfMAC = deviceMAC;
     sniffedPackets.push_back(sniffedPacket);
-    const int capacity = JSON_OBJECT_SIZE(4);
+    //const int capacity = JSON_OBJECT_SIZE(4);
 
-    DynamicJsonDocument doc(1024);
-    doc["MAC"] = str;
-    doc["timestamp"] = now();
-    doc["RSSI"] = sniffedPacket.RSSI;
-    doc["snifferMAC"] = deviceMAC;
-    serializeJson(doc, Serial);
-    //StaticJsonDocument<capacity> doc;
+    // DynamicJsonDocument doc(1024);
+    // doc["MAC"] = str;
+    // doc["timestamp"] = now();
+    // doc["RSSI"] = sniffedPacket.RSSI;
+    // doc["snifferMAC"] = deviceMAC;
+    // serializeJson(doc, Serial);
+
+    // //StaticJsonDocument<capacity> doc;
     // doc["MAC"] = str;
     // doc["timestamp"] = now();
     // doc["RSSI"] = snifferPacket->rx_ctrl.rssi;
@@ -154,7 +158,7 @@ static void getMAC(char *addr, uint8_t *data, uint16_t offset) {
 
 #define CHANNEL_HOP_INTERVAL_MS 1000
 static os_timer_t channelHop_timer;
-
+static os_timer_t sendInfo_timer;
 /**
  * Callback for channel hoping
  */
@@ -166,27 +170,13 @@ void channelHop() {
     }
     wifi_set_channel(new_channel);
 }
-/*void modSwitch() {
-    const char *ssid = "canawar";
-    const char *password = "123456789";
-
-    wifi_set_opmode(STATION_MODE);
-    WiFi.begin(ssid, password);
-    Serial.println("Connecting to RaspberryPi");
-    int i = 0;
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(1000);
-        Serial.print(i++);
-    }
-    Serial.println("Connected to Cacaking");
-    Serial.println(WiFi.localIP());
+int infoFlag = 0;
+void sendInfo() {
+    infoFlag = 1;
 }
-*/
+Ticker ticker;
 
-void setup() {
-    // set the WiFi chip to "promiscuous" mode aka monitor mode
-    Serial.begin(115200);
-    delay(10);
+void promiscousSetup() {
     wifi_set_opmode(STATION_MODE);
     wifi_set_channel(1);
     wifi_promiscuous_enable(DISABLE);
@@ -194,25 +184,48 @@ void setup() {
     wifi_set_promiscuous_rx_cb(sniffer_callback);
     delay(10);
     wifi_promiscuous_enable(ENABLE);  // setup the channel hoping callback timer
-    // os_timer_disarm(&channelHop_timer);
-    // os_timer_setfn(&channelHop_timer, (os_timer_func_t *)channelHop, NULL);
-    // os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
+    os_timer_disarm(&channelHop_timer);
+
+    os_timer_setfn(&channelHop_timer, (os_timer_func_t *)channelHop, NULL);
+    os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
+}
+void setup() {
+    // set the WiFi chip to "promiscuous" mode aka monitor mode
+    Serial.begin(115200);
+    delay(10);
+    sniffedPackets.reserve(500);
+    promiscousSetup();
+    ticker.attach(20, sendInfo);
+
     unsigned char mac[6];
     WiFi.macAddress(mac);
     deviceMAC += macToStr(mac);
-    Serial.println("Connecting to ");
-    Serial.println(ssid);
-    wifi_promiscuous_enable(DISABLE);
-    delay(10);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("");
-    Serial.println("WiFi connected");
 }
-
 void loop() {
-    delay(10);
+    if (infoFlag == 1) {
+        ticker.detach();
+        os_timer_disarm(&channelHop_timer);
+        wifi_promiscuous_enable(DISABLE);
+
+        Serial.println("Connecting to ");
+        Serial.println(ssid);
+        WiFi.begin(ssid, password);
+        while (WiFi.status() != WL_CONNECTED) {
+            delay(500);
+            Serial.print(".");
+        }
+        Serial.println("");
+        Serial.println("WiFi connected");
+        http.begin("http://192.168.43.161:1323/sniffer");
+        http.addHeader("Content-Type", "application/json");
+        int httpCode = http.POST("deneme");
+
+        Serial.println(httpCode);
+        infoFlag = 0;
+        ticker.attach(20, sendInfo);
+        WiFi.disconnect(true);
+        bool wifi_flag = WiFi.isConnected();
+        Serial.println(wifi_flag);
+        promiscousSetup();
+    }
 }
