@@ -116,7 +116,7 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.RSSI = snifferPacket->rx_ctrl.rssi;
     sniffedPacket.timestamp = now();
     sniffedPacket.selfMAC = deviceMAC;
-    sniffedPackets.push_back(sniffedPacket);
+    // sniffedPackets.push_back(sniffedPacket);
     //const int capacity = JSON_OBJECT_SIZE(4);
 
     // DynamicJsonDocument doc(1024);
@@ -219,13 +219,17 @@ void loop() {
         http.begin("http://192.168.43.161:1323/sniffer");
         http.addHeader("Content-Type", "application/json");
         int httpCode = http.POST("deneme");
-
+        http.end();
         Serial.println(httpCode);
         infoFlag = 0;
         ticker.attach(20, sendInfo);
         WiFi.disconnect(true);
-        bool wifi_flag = WiFi.isConnected();
-        Serial.println(wifi_flag);
+        while (WiFi.isConnected()) {
+            Serial.println("Disconnecting");
+            Serial.print(".");
+            delay(100);
+        }
+        Serial.println("Disconnected successfulyy.");
         promiscousSetup();
     }
 }
