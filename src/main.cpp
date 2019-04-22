@@ -220,11 +220,6 @@ void loop() {
         http.begin("http://192.168.43.161:1323/packet");
         http.addHeader("Content-Type", "application/json");
 
-        unsigned numberOfPackets = sniffedPackets.size();
-
-        DynamicJsonDocument doc(numberOfPackets + 1 + (numberOfPackets * 126));
-        JsonArray ar = doc.to<JsonArray>();
-
         DynamicJsonDocument pkt(126);
 
         for (int i = 0; i < sniffedPackets.size(); i++) {
@@ -236,17 +231,16 @@ void loop() {
             obj["timestamp"] = sniffedPacket.timestamp;
             obj["selfMAC"] = deviceMAC;
 
-            ar.add(obj);
+            String json;
+            serializeJson(obj, json);
+            int httpCode = http.POST(json);
+            Serial.println(httpCode);
         }
-        String json;
-        serializeJson(ar, json);
 
-        int httpCode = http.POST(json);
         http.end();
 
         sniffedPackets.clear();
 
-        Serial.println(httpCode);
         infoFlag = 0;
         ticker.attach(20, sendInfo);
         WiFi.disconnect(true);
