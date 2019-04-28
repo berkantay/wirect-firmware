@@ -6,7 +6,6 @@
 #include <TimeLib.h>
 #include <unordered_map>
 #include <vector>
-
 using namespace std;
 extern "C" {
 #include <user_interface.h>
@@ -200,7 +199,7 @@ void setup() {
     Serial.println("");
     Serial.println("WiFi connected");
 
-    http.begin("http://192.168.43.161:1323/time");
+    http.begin("http://192.168.1.120:1323/time");
     int resCode = http.GET();
     String payload = http.getString();
     http.end();
@@ -234,7 +233,7 @@ void loop() {
         }
         Serial.println("");
         Serial.println("WiFi connected");
-        http.begin("http://192.168.43.161:1323/packet");
+        http.begin("http://192.168.1.120:1323/packet");
         http.addHeader("Content-Type", "application/json");
 
         DynamicJsonDocument pkt(126);
