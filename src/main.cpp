@@ -21,11 +21,10 @@ extern "C" {
 #define SUBTYPE_PROBE_REQUEST 0x04
 
 String deviceMAC = "";
-const char *ssid = "wirectTr";
-const char *password = "wirect123";
+const char *ssid = "3Durak";
+const char *password = "3durak2015";
 WiFiClient client;
 HTTPClient http;
-
 String macToStr(const uint8_t *mac) {
     String result;
     for (int i = 0; i < 6; ++i) {
@@ -193,6 +192,22 @@ void setup() {
     // set the WiFi chip to "promiscuous" mode aka monitor mode
     Serial.begin(115200);
     delay(10);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
+
+    http.begin("http://192.168.43.161:1323/time");
+    int resCode = http.GET();
+    String payload = http.getString();
+    http.end();
+    StaticJsonDocument<200> doc;
+    deserializeJson(doc, payload);
+    int currentTime = doc["now"];
+    setTime(currentTime);
     sniffedPackets.reserve(500);
     promiscousSetup();
     ticker.attach(20, sendInfo);
@@ -204,6 +219,8 @@ void setup() {
 void loop() {
     //Serial.println(deviceMAC);
     if (infoFlag == 1) {
+        Serial.println("Guncel Vakit");
+        Serial.println(now());
         ticker.detach();
         os_timer_disarm(&channelHop_timer);
         wifi_promiscuous_enable(DISABLE);
