@@ -21,7 +21,7 @@ extern "C" {
 #define SUBTYPE_PROBE_REQUEST 0x04
 
 String deviceMAC = "";
-const char *ssid = "wirect";
+const char *ssid = "wirectTr";
 const char *password = "wirect123";
 WiFiClient client;
 HTTPClient http;
