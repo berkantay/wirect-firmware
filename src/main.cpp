@@ -191,7 +191,11 @@ void setup() {
     // set the WiFi chip to "promiscuous" mode aka monitor mode
     Serial.begin(115200);
     delay(10);
+    unsigned char mac[6];
+    WiFi.macAddress(mac);
+    deviceMAC += macToStr(mac);
     WiFi.begin(ssid, password);
+
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -199,8 +203,19 @@ void setup() {
     Serial.println("");
     Serial.println("WiFi connected");
 
-    http.begin("http://192.168.1.120:1323/time");
-    int resCode = http.GET();
+    StaticJsonDocument<200> deviceDoc;
+    deviceDoc["MAC"] = deviceMAC;
+    String deviceJSON;
+    serializeJson(deviceDoc, deviceJSON);
+    http.begin("http://192.168.43.162:1323/sniffers");
+    http.addHeader("Content-type", "application/json");
+    int deviceCode = http.POST(deviceJSON);
+    Serial.println("device post status: ");
+    Serial.println(deviceCode);
+    http.end();
+
+    http.begin("http://192.168.43.162:1323/time");
+    http.GET();
     String payload = http.getString();
     http.end();
     StaticJsonDocument<200> doc;
@@ -208,15 +223,13 @@ void setup() {
     int currentTime = doc["now"];
     setTime(currentTime);
     sniffedPackets.reserve(500);
+    // delay(100000);
     promiscousSetup();
     ticker.attach(20, sendInfo);
 
-    unsigned char mac[6];
-    WiFi.macAddress(mac);
-    deviceMAC += macToStr(mac);
 }
+
 void loop() {
-    //Serial.println(deviceMAC);
     if (infoFlag == 1) {
         Serial.println("Guncel Vakit");
         Serial.println(now());
@@ -233,8 +246,33 @@ void loop() {
         }
         Serial.println("");
         Serial.println("WiFi connected");
-        http.begin("http://192.168.1.120:1323/packet");
-        http.addHeader("Content-Type", "application/json");
+        // http.begin("http://192.168.1.120:1323/packet");
+        // http.addHeader("Content-Type", "application/json");
+
+        // DynamicJsonDocument pkt(126);
+
+        // for (int i = 0; i < sniffedPackets.size(); i++) {
+        //     JsonObject obj = pkt.to<JsonObject>();
+        //     Packet sniffedPacket = sniffedPackets[i];
+
+        //     obj["MAC"] = sniffedPacket.MAC;
+        //     obj["RSSI"] = sniffedPacket.RSSI;
+        //     obj["timestamp"] = sniffedPacket.timestamp;
+        //     obj["selfMAC"] = deviceMAC;
+
+        //     String json;
+        //     serializeJson(obj, json);
+        //     int httpCode = http.POST(json);
+        //     Serial.println(httpCode);
+        // }
+
+        // http.end();
+
+        http.begin("http://192.168.43.162:1323/packets-collection");
+        unsigned numberOfPackets = sniffedPackets.size();
+
+        DynamicJsonDocument doc(numberOfPackets + 1 + (numberOfPackets * 126));
+        JsonArray ar = doc.to<JsonArray>();
 
         DynamicJsonDocument pkt(126);
 
@@ -245,15 +283,17 @@ void loop() {
             obj["MAC"] = sniffedPacket.MAC;
             obj["RSSI"] = sniffedPacket.RSSI;
             obj["timestamp"] = sniffedPacket.timestamp;
-            obj["selfMAC"] = deviceMAC;
+            obj["snifferMAC"] = deviceMAC;
 
-            String json;
-            serializeJson(obj, json);
-            int httpCode = http.POST(json);
-            Serial.println(httpCode);
+            ar.add(obj);
         }
+        String json;
+        serializeJson(ar, json);
 
-        http.end();
+        http.addHeader("Content-type", "application/json");
+        int httpCode = http.POST(json);
+        Serial.println("packets post status: ");
+        Serial.println(httpCode);
 
         sniffedPackets.clear();
 
