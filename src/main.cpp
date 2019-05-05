@@ -40,10 +40,14 @@ typedef struct Packet {
     String MAC;
     time_t timestamp;
     float RSSI;
-    String selfMAC;
+    String SSID;
+    //String selfMAC;
+
 } Packet;
 
 vector<Packet> sniffedPackets;
+vector<Packet> sniffedRouters;
+
 unordered_map<string, Packet> sweepMap;
 struct RxControl {
     signed rssi : 8;  // signal intensity of packet
@@ -117,15 +121,24 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.MAC = str;
     sniffedPacket.RSSI = snifferPacket->rx_ctrl.rssi;
     sniffedPacket.timestamp = now();
-    sniffedPacket.selfMAC = deviceMAC;
+
+    //sniffedPacket.selfMAC = deviceMAC;
 
     string moc = str.c_str();
     sweepMap[moc] = sniffedPacket;
 
     uint8_t SSID_length = snifferPacket->data[25];
-    Serial.print(" SSID: ");
-    printDataSpan(26, SSID_length, snifferPacket->data);
+    String SSID;
+    for (int i = 0; i < DATA_LENGTH && i < SSID_length; i++) {
+        SSID += (char)snifferPacket->data[26 + i];
+    }
+    sniffedPacket.SSID = SSID;
+
+    //Serial.print(" SSID: ");
+    //printDataSpan(26, SSID_length, snifferPacket->data);
+
     Serial.println();
+    Serial.println(SSID);
 }
 
 /**
@@ -160,7 +173,11 @@ void channelHop() {
         Serial.print("Sweep size : ");
         Serial.println(sweepMap.size());
         for (auto it : sweepMap) {
-            sniffedPackets.push_back(it.second);
+            if (it.second.SSID == "") {
+                sniffedPackets.push_back(it.second);
+            } else {
+                sniffedRouters.push_back(it.second);
+            }
         }
         sweepMap.clear();
         Serial.print("Total sniffed : ");
@@ -329,8 +346,35 @@ void loop() {
         int httpCode = http.POST(json);
         Serial.println("packets post status: ");
         Serial.println(httpCode);
+        http.end();
+        http.begin("http://192.168.1.120:1323/sniffers/" + encodedMAC + "/routers");
+        numberOfPackets = sniffedRouters.size();
+
+        DynamicJsonDocument routerDoc(numberOfPackets + 1 + (numberOfPackets * 126));
+        JsonArray routerArray = routerDoc.to<JsonArray>();
+
+        DynamicJsonDocument routerPacket(126);
+
+        for (int i = 0; i < sniffedRouters.size(); i++) {
+            JsonObject obj = pkt.to<JsonObject>();
+            Packet sniffedRouter = sniffedRouters[i];
+
+            obj["MAC"] = sniffedRouter.MAC;
+            obj["timestamp"] = sniffedRouter.timestamp;
+
+            routerArray.add(obj);
+        }
+        String routerJson;
+        serializeJson(routerArray, routerJson);
+
+        http.addHeader("Content-type", "application/json");
+        httpCode = http.POST(json);
+        Serial.println("packets post status: ");
+        Serial.println(httpCode);
+        http.end();
 
         sniffedPackets.clear();
+        sniffedRouters.clear();
 
         infoFlag = 0;
         ticker.attach(20, sendInfo);
