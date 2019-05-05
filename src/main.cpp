@@ -24,6 +24,7 @@ const char *ssid = "3Durak";
 const char *password = "3durak2015";
 WiFiClient client;
 HTTPClient http;
+String encodedMAC;
 String macToStr(const uint8_t *mac) {
     String result;
     for (int i = 0; i < 6; ++i) {
@@ -187,6 +188,40 @@ void promiscousSetup() {
     os_timer_setfn(&channelHop_timer, (os_timer_func_t *)channelHop, NULL);
     os_timer_arm(&channelHop_timer, CHANNEL_HOP_INTERVAL_MS, 1);
 }
+
+String urlencode(String str) {
+    String encodedString = "";
+    char c;
+    char code0;
+    char code1;
+    char code2;
+    for (int i = 0; i < str.length(); i++) {
+        c = str.charAt(i);
+        if (c == ' ') {
+            encodedString += '+';
+        } else if (isalnum(c)) {
+            encodedString += c;
+        } else {
+            code1 = (c & 0xf) + '0';
+            if ((c & 0xf) > 9) {
+                code1 = (c & 0xf) - 10 + 'A';
+            }
+            c = (c >> 4) & 0xf;
+            code0 = c + '0';
+            if (c > 9) {
+                code0 = c - 10 + 'A';
+            }
+            code2 = '\0';
+            encodedString += '%';
+            encodedString += code0;
+            encodedString += code1;
+            //encodedString+=code2;
+        }
+        yield();
+    }
+    return encodedString;
+}
+
 void setup() {
     // set the WiFi chip to "promiscuous" mode aka monitor mode
     Serial.begin(115200);
@@ -194,8 +229,9 @@ void setup() {
     unsigned char mac[6];
     WiFi.macAddress(mac);
     deviceMAC += macToStr(mac);
+    encodedMAC = urlencode(deviceMAC);
+    Serial.println(encodedMAC);
     WiFi.begin(ssid, password);
-
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -207,14 +243,14 @@ void setup() {
     deviceDoc["MAC"] = deviceMAC;
     String deviceJSON;
     serializeJson(deviceDoc, deviceJSON);
-    http.begin("http://192.168.43.162:1323/sniffers");
+    http.begin("http://192.168.1.120:1323/sniffers");
     http.addHeader("Content-type", "application/json");
     int deviceCode = http.POST(deviceJSON);
     Serial.println("device post status: ");
     Serial.println(deviceCode);
     http.end();
 
-    http.begin("http://192.168.43.162:1323/time");
+    http.begin("http://192.168.1.120:1323/time");
     http.GET();
     String payload = http.getString();
     http.end();
@@ -226,7 +262,6 @@ void setup() {
     // delay(100000);
     promiscousSetup();
     ticker.attach(20, sendInfo);
-
 }
 
 void loop() {
@@ -268,7 +303,7 @@ void loop() {
 
         // http.end();
 
-        http.begin("http://192.168.43.162:1323/packets-collection");
+        http.begin("http://192.168.1.120:1323/sniffers/" + encodedMAC + "/packets-collection");
         unsigned numberOfPackets = sniffedPackets.size();
 
         DynamicJsonDocument doc(numberOfPackets + 1 + (numberOfPackets * 126));
