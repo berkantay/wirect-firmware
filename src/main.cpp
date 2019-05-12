@@ -20,8 +20,8 @@ extern "C" {
 #define SUBTYPE_PROBE_REQUEST 0x04
 
 String deviceMAC = "";
-const char *ssid = "3Durak";
-const char *password = "3durak2015";
+const char *ssid = "wirect";
+const char *password = "wirect123qwe";
 WiFiClient client;
 HTTPClient http;
 String encodedMAC;
@@ -41,13 +41,15 @@ typedef struct Packet {
     time_t timestamp;
     float RSSI;
     String SSID;
-    //String selfMAC;
-
 } Packet;
 
-vector<Packet> sniffedPackets;
-vector<Packet> sniffedRouters;
+typedef struct Router {
+    String SSID;
+    time_t timestamp;
+} Rotuer;
 
+vector<Packet> sniffedPackets;
+unordered_map<string, Router> sniffedRouters;
 unordered_map<string, Packet> sweepMap;
 struct RxControl {
     signed rssi : 8;  // signal intensity of packet
@@ -83,8 +85,6 @@ struct SnifferPacket {
     uint16_t len;
 };
 
-// Declare each custom function (excluding built-in, such as setup and loop) before it will be called.
-// https://docs.platformio.org/en/latest/faq.html#convert-arduino-file-to-c-manually
 static void showMetadata(SnifferPacket *snifferPacket);
 static void ICACHE_FLASH_ATTR sniffer_callback(uint8_t *buffer, uint16_t length);
 static void printDataSpan(uint16_t start, uint16_t size, uint8_t *data);
@@ -122,8 +122,6 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     sniffedPacket.RSSI = snifferPacket->rx_ctrl.rssi;
     sniffedPacket.timestamp = now();
 
-    //sniffedPacket.selfMAC = deviceMAC;
-
     string moc = str.c_str();
     sweepMap[moc] = sniffedPacket;
 
@@ -132,13 +130,21 @@ static void showMetadata(SnifferPacket *snifferPacket) {
     for (int i = 0; i < DATA_LENGTH && i < SSID_length; i++) {
         SSID += (char)snifferPacket->data[26 + i];
     }
-    sniffedPacket.SSID = SSID;
+    Serial.print("\n");
 
-    //Serial.print(" SSID: ");
+    if(SSID != ""){
+        string strSSID = SSID.c_str();
+        Router router;
+        router.SSID = SSID;
+        router.timestamp = now();
+        sniffedRouters[strSSID] = router; 
+
+        Serial.print("\n---------\nSSID: ");
+        Serial.println(sniffedRouters[strSSID].SSID);
+        Serial.println(sniffedRouters[strSSID].timestamp);
+        Serial.print("\n------------\n");
+    }
     //printDataSpan(26, SSID_length, snifferPacket->data);
-
-    Serial.println();
-    Serial.println(SSID);
 }
 
 /**
@@ -170,22 +176,20 @@ void channelHop() {
     uint8 new_channel = wifi_get_channel() + 1;
 
     if (new_channel > 13) {
-        Serial.print("Sweep size : ");
-        Serial.println(sweepMap.size());
         for (auto it : sweepMap) {
-            if (it.second.SSID == "") {
-                sniffedPackets.push_back(it.second);
-            } else {
-                sniffedRouters.push_back(it.second);
-            }
+            sniffedPackets.push_back(it.second);    
+            Serial.print("Total sniffed : ");
+            Serial.print(sniffedPackets.size());
+            Serial.print("\n");
         }
         sweepMap.clear();
-        Serial.print("Total sniffed : ");
-        Serial.println(sniffedPackets.size());
         new_channel = 1;
     }
     wifi_set_channel(new_channel);
+    Serial.println("Channel set");
+
 }
+
 int infoFlag = 0;
 void sendInfo() {
     infoFlag = 1;
@@ -260,14 +264,14 @@ void setup() {
     deviceDoc["MAC"] = deviceMAC;
     String deviceJSON;
     serializeJson(deviceDoc, deviceJSON);
-    http.begin("http://192.168.1.120:1323/sniffers");
+    http.begin("http://192.168.12.1:1323/sniffers");
     http.addHeader("Content-type", "application/json");
     int deviceCode = http.POST(deviceJSON);
     Serial.println("device post status: ");
     Serial.println(deviceCode);
     http.end();
 
-    http.begin("http://192.168.1.120:1323/time");
+    http.begin("http://192.168.12.1:1323/time");
     http.GET();
     String payload = http.getString();
     http.end();
@@ -276,6 +280,7 @@ void setup() {
     int currentTime = doc["now"];
     setTime(currentTime);
     sniffedPackets.reserve(500);
+    sniffedRouters.reserve(100);
     // delay(100000);
     promiscousSetup();
     ticker.attach(20, sendInfo);
@@ -283,7 +288,6 @@ void setup() {
 
 void loop() {
     if (infoFlag == 1) {
-        Serial.println("Guncel Vakit");
         Serial.println(now());
         ticker.detach();
         os_timer_disarm(&channelHop_timer);
@@ -298,7 +302,7 @@ void loop() {
         }
         Serial.println("");
         Serial.println("WiFi connected");
-        // http.begin("http://192.168.1.120:1323/packet");
+        // http.begin("http://192.168.12.1:1323/packet");
         // http.addHeader("Content-Type", "application/json");
 
         // DynamicJsonDocument pkt(126);
@@ -320,7 +324,7 @@ void loop() {
 
         // http.end();
 
-        http.begin("http://192.168.1.120:1323/sniffers/" + encodedMAC + "/packets-collection");
+        http.begin("http://192.168.12.1:1323/sniffers/" + encodedMAC + "/packets-collection");
         unsigned numberOfPackets = sniffedPackets.size();
 
         DynamicJsonDocument doc(numberOfPackets + 1 + (numberOfPackets * 126));
@@ -347,7 +351,7 @@ void loop() {
         Serial.println("packets post status: ");
         Serial.println(httpCode);
         http.end();
-        http.begin("http://192.168.1.120:1323/sniffers/" + encodedMAC + "/routers");
+        http.begin("http://192.168.12.1:1323/sniffers/" + encodedMAC + "/routers");
         numberOfPackets = sniffedRouters.size();
 
         DynamicJsonDocument routerDoc(numberOfPackets + 1 + (numberOfPackets * 126));
@@ -355,12 +359,12 @@ void loop() {
 
         DynamicJsonDocument routerPacket(126);
 
-        for (int i = 0; i < sniffedRouters.size(); i++) {
+        for (auto it : sniffedRouters) {
             JsonObject obj = pkt.to<JsonObject>();
-            Packet sniffedRouter = sniffedRouters[i];
+            Router sniffedRouter = it.second;
 
-            obj["MAC"] = sniffedRouter.MAC;
-            obj["timestamp"] = sniffedRouter.timestamp;
+            obj["SSID"] = sniffedRouter.SSID;
+            obj["lastSeen"] = sniffedRouter.timestamp;
 
             routerArray.add(obj);
         }
@@ -368,7 +372,7 @@ void loop() {
         serializeJson(routerArray, routerJson);
 
         http.addHeader("Content-type", "application/json");
-        httpCode = http.POST(json);
+        httpCode = http.POST(routerJson);
         Serial.println("packets post status: ");
         Serial.println(httpCode);
         http.end();
